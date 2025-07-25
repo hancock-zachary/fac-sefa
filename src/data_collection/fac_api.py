@@ -69,13 +69,14 @@ class FACClient:
         output_string = input_string.strip().lower()  # Normalize the string variable.
         return output_string
     
-    def _make_request(self, endpoint_name: str, params: Dict = None) -> List[Dict]:
+    def _make_request(self, endpoint_name: str, params: Dict = None, handle_429: bool = False) -> List[Dict]:
         """
         Purpose:
             Make an endpoint specific API request with error handling.
         Args:
             endpoint_name: Name of the endpoint (e.g., 'general', 'findings')
             params: Query parameters to include in the request
+            handle_429: If True, automatically retry on 429 errors indefinitely using Retry-After header
         Returns:
             List of records from the API.
         Raises:
@@ -92,34 +93,49 @@ class FACClient:
         endpoint = self.endpoints.get(f"{endpoint_name}")  # Identify the endpoint to add to the url.
         url = f"{self.base_url}{endpoint}"  # Add endpoint to the base url.
         
-        try:
-            response = self.session.get(url, params=params or {})
-            response.raise_for_status()  # Raises exception for bad status codes.
-            result = response.json()
-            # FAC API returns data as a list
-            if isinstance(result, list):
-                return result
-            else:
-                # Log unexpected response format but don't fail
-                print(f"Warning: Expected list from {endpoint_name}, got {type(result)}")
-                return []
-        except requests.exceptions.HTTPError as e:
-            if response.status_code == 401:
-                raise APIError("Authentication failed. Check your API key.") from e
-            elif response.status_code == 429:
-                raise APIError("Rate limit exceeded. Please wait before making more requests.") from e
-            elif response.status_code == 404:
-                raise APIError(f"Endpoint not found: {endpoint_name}") from e
-            else:
-                raise APIError(f"HTTP {response.status_code} error for {endpoint_name}: {e}") from e
-        except requests.exceptions.ConnectionError as e:
-            raise APIError(f"Failed to connect to FAC API: {e}") from e
-        except requests.exceptions.Timeout as e:
-            raise APIError(f"Request timeout for {endpoint_name}: {e}") from e
-        except requests.exceptions.RequestException as e:
-            raise APIError(f"Request failed for {endpoint_name}: {e}") from e
-        except ValueError as e:  # JSON decode error
-            raise APIError(f"Invalid JSON response from {endpoint_name}: {e}") from e
+        while True:
+            try:
+                response = self.session.get(url, params=params or {})
+                response.raise_for_status()  # Raises exception for bad status codes.
+                result = response.json()
+
+                if isinstance(result, list):  # FAC API returns data as a list
+                    return result
+                else:
+                    print(f"Warning: Expected list from {endpoint_name}, got {type(result)}")  # Log unexpected response format
+                    return []
+            except requests.exceptions.HTTPError as e:
+                if response.status_code == 401:
+                    raise APIError("Authentication failed. Check your API key.") from e
+                elif response.status_code == 429:
+                    if not handle_429:
+                        raise APIError("Rate limit exceeded. Please wait before making more requests.") from e
+                    else:
+                        retry_after = response.headers.get('Retry-After') or response.headers.get('retry-after')
+                        if retry_after:
+                            try:
+                                wait_time = float(retry_after)
+                                print(f"Rate limit hit (Server requested {retry_after}s wait. Waiting {wait_time:.1f}s...")
+                                time.sleep(wait_time)
+                                continue
+                            except ValueError:
+                                print(f"Invalid Retry-After header: {retry_after}")
+                
+                elif response.status_code == 404:
+                    raise APIError(f"Endpoint not found: {endpoint_name}") from e
+                else:
+                    raise APIError(f"HTTP {response.status_code} error for {endpoint_name}: {e}") from e
+            except requests.exceptions.ConnectionError as e:
+                raise APIError(f"Failed to connect to FAC API: {e}") from e
+            except requests.exceptions.Timeout as e:
+                raise APIError(f"Request timeout for {endpoint_name}: {e}") from e
+            except requests.exceptions.RequestException as e:
+                raise APIError(f"Request failed for {endpoint_name}: {e}") from e
+            except ValueError as e:  # JSON decode error
+                raise APIError(f"Invalid JSON response from {endpoint_name}: {e}") from e
+            
+            if not handle_429:
+                break
 
     def get_general(self
                     , report_id: str | None = None
@@ -129,6 +145,7 @@ class FACClient:
                     , auditee_city: str | None = None
                     , auditee_state: str | None = None
                     , audit_year: int | None = None
+                    , handle_429: bool = False
                     ) -> List[Dict]:
         """
         Purpose:
@@ -141,6 +158,9 @@ class FACClient:
             auditee_city: City name where the auditee is located
             auditee_state: State abbreviation where the auditee is located
             audit_year: Audit year of SEFA report, typically lagged by one calendar year
+            handle_429: If True, automatically retry on 429 errors using Retry-After header
+            max_retries: Maximum number of retry attempts for 429 errors (only used if handle_429=True)
+            max_backoff: Maximum backoff delay in seconds (only used if handle_429=True)
         Returns:
             List of audit records from the general endpoint.
         """
@@ -160,10 +180,14 @@ class FACClient:
         if audit_year is not None:
             params['audit_year'] = f"eq.{audit_year}"
         
-        return self._make_request('general', params)
+        return self._make_request(endpoint_name='general', params=params, handle_429=handle_429)
 
 
 #%%
 # Test code.
 if __name__ == "__main__":
-    pass
+    results = FACClient().get_general(auditee_state='CA', handle_429=True)
+    report_ids = []
+    for result in results:
+        report_ids.append(result.get('report_id'))
+    print(len(report_ids))  # Max responses is 20_000

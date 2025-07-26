@@ -31,7 +31,6 @@ class FACClient:
             self.session.headers.update({'X-API-Key': self.api_key})  # Header gets sent with every request automatically.
         else:
             raise APIError("API key is required. Set API_KEY_FAC environment variable.")
-
         
         # Set up API url.
         self.base_url = 'https://api.fac.gov'
@@ -47,6 +46,17 @@ class FACClient:
             , 'passthrough': '/passthrough'
             , 'secondary_auditors': '/secondary_auditors'
         }
+
+        # Features of the FAC API.
+        self.max_single_request_size = 20_000
+        self.min_audit_year = 2016
+        self.max_audit_year = int(time.strftime('%Y'))
+        self.all_auditee_states = [
+            'AK', 'AL', 'AR', 'AS', 'AZ', 'CA', 'CO', 'CT', 'DC', 'DE', 'FL', 'FM', 'GA', 'GU', 'HI', 'IA', 'ID'
+            , 'IL', 'IN', 'KS', 'KY', 'LA', 'MA', 'MD', 'ME', 'MH', 'MI', 'MN', 'MO', 'MP', 'MS', 'MT', 'NC', 'ND'
+            , 'NE', 'NH', 'NJ', 'NM', 'NV', 'NY', 'OH', 'OK', 'OR', 'PA', 'PR', 'PW', 'RI', 'SC', 'SD', 'TN', 'TX'
+            , 'UT', 'VA', 'VI', 'VT', 'WA', 'WI', 'WV', 'WY'
+        ]
 
     def _validate_string(self, input_string: str) -> str:
         """
@@ -182,12 +192,23 @@ class FACClient:
         
         return self._make_request(endpoint_name='general', params=params, handle_429=handle_429)
 
+    def get_all_general(self, show_progress: bool = False):
+        all_results = []
+        for year in range(self.min_audit_year, self.max_audit_year + 1):
+            for state in self.all_auditee_states:
+                if show_progress:
+                    print(f"Processing {year}-{state}...")
+                results = self.get_general(audit_year=year, auditee_state=state, handle_429=True)
+                all_results.extend(results)
+        if show_progress:
+            print(f"Total records retrieved: {len(all_results)}")
+        return all_results
+
 
 #%%
 # Test code.
 if __name__ == "__main__":
-    results = FACClient().get_general(auditee_state='CA', handle_429=True)
-    report_ids = []
-    for result in results:
-        report_ids.append(result.get('report_id'))
-    print(len(report_ids))  # Max responses is 20_000
+    results = FACClient().get_all_general(show_progress=True)
+
+
+#%%

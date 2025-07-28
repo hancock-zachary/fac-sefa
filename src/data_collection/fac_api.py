@@ -174,7 +174,7 @@ class FACClient:
         Returns:
             List of audit records from the general endpoint.
         """
-        params = {}
+        params = {}  # Initialize an empty dictionary for query parameters.
         if report_id is not None:
             params['report_id'] = f"eq.{report_id}"
         if auditee_uei is not None:
@@ -217,6 +217,38 @@ class FACClient:
             print(f"Total records retrieved: {len(all_results)}")
         return all_results
 
+    def get_federal_awards(self
+                           , report_id: str | None = None
+                           , federal_agency_prefix: str | None = None
+                           , federal_award_extension: str | None = None
+                           , additional_award_identification: str | None = None
+                           , federal_program_name: str | None = None
+                           , cluster_name: str | None = None
+                           , handle_429: bool = False
+                           ) -> List[Dict]:
+        """
+        Purpose:
+            Get federal awards data for a specific report ID.
+        Args:
+            report_id: Specific SEFA report ID
+        Returns:
+            List of federal awards records.
+        """
+        params = {}  # Initialize an empty dictionary for query parameters.
+        if report_id is not None:
+            params = {'report_id': f"eq.{report_id}"}
+        if federal_agency_prefix is not None:
+            params = {'federal_agency_prefix': f"eq.{federal_agency_prefix}"}
+        if federal_award_extension is not None:
+            params = {'federal_award_extension': f"eq.{federal_award_extension}"}
+        if additional_award_identification is not None:
+            params = {'additional_award_identification': f"eq.*{additional_award_identification}*"}
+        if federal_program_name is not None:
+            params = {'federal_program_name': f"ilike.*{federal_program_name}*"}  # "ilike" is case insensitive. "like" is case sensitive.
+        if cluster_name is not None:
+            params = {'cluster_name': f"ilike.*{cluster_name}*"}
+
+        return self._make_request(endpoint_name='federal_awards', params=params, handle_429=handle_429)
     
 
 #%%

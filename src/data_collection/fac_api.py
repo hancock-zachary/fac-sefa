@@ -192,18 +192,32 @@ class FACClient:
         
         return self._make_request(endpoint_name='general', params=params, handle_429=handle_429)
 
-    def get_all_general(self, show_progress: bool = False):
-        all_results = []
-        for year in range(self.min_audit_year, self.max_audit_year + 1):
-            for state in self.all_auditee_states:
-                if show_progress:
+    def get_all_general(self, show_progress: bool = False) -> list[Dict]:
+        """
+        Purpose:
+            Collect all results from the \"general\" endpoint from the FAC database.
+        Args:
+            show_progress: Boolean value to print out results in the terminal for testing reasons.
+        Returns:
+            all_results: A list of all of the dictionary responses that are returned from the API.
+        """
+        all_results = []  # Store all queried results from the FAC database.
+        
+        # The max number of results that can be pulled from the API is 20,000 results. Looping over time and states ensures no call asks for too many records.
+        for year in range(self.min_audit_year, self.max_audit_year + 1):  # Loop from 2016 to the current year.
+            for state in self.all_auditee_states:  # Loop across all states.
+                if show_progress:  # Print out the current year and state being processed.
                     print(f"Processing {year}-{state}...")
-                results = self.get_general(audit_year=year, auditee_state=state, handle_429=True)
-                all_results.extend(results)
-        if show_progress:
+                try:  # Exception handling for API calls.
+                    results = self.get_general(audit_year=year, auditee_state=state, handle_429=True)  # Get results for the current year and state.
+                    all_results.extend(results)  # Add pulled results to the all_results list.
+                except APIError as e:
+                    print(f"Error retrieving data for {year}-{state}: {e}")
+        if show_progress:  # Return the total number of records retrieved.
             print(f"Total records retrieved: {len(all_results)}")
         return all_results
 
+    
 
 #%%
 # Test code.

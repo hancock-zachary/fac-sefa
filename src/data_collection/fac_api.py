@@ -283,6 +283,14 @@ class FACClient:
         params = {}  # Initialize an empty dictionary for query parameters.
         if columns is not None:
             if isinstance(columns, list):
+                for col in columns:  # Validate that all columns input are allowed columns.
+                    allowed_columns = [  # List of allowed columns for the federal_awards endpoint.
+                        'report_id', 'auditee_uei', 'audit_year', 'award_reference', 'federal_agency_prefix', 'federal_award_extension', 'additional_award_identification'
+                        , 'federal_program_name', 'amount_expended', 'cluster_name', 'other_cluster_name', 'state_cluster_name', 'cluster_total', 'federal_program_total'
+                        , 'is_major', 'is_loan', 'loan_balance', 'is_direct', 'audit_report_type', 'findings_count', 'is_passthrough_award', 'passthrough_amount'
+                    ]
+                    if col.strip().lower() not in allowed_columns:
+                        raise ValueError(f"Invalid column name: {col}. Allowed columns: {', '.join(allowed_columns)}.")
                 params['select'] = ','.join(columns)
             else:
                 raise TypeError(f"columns must be a list, got {type(columns).__name__}.")
@@ -401,8 +409,8 @@ class FACClient:
 if __name__ == "__main__":
     # city = FACClient().get_general(auditee_city='Vacaville', auditee_state='CA')
     # print(city)
-    # report = FACClient().get_general(report_id='2023-06-GSAFAC-0000050078')
-    # print(report)
+    report = FACClient().get_federal_awards(report_id='2023-06-GSAFAC-0000050078')
+    print(report)
     # gen_results = FACClient().get_all_general(columns=['report_id'], show_progress=True)
     # fed_results = FACClient().get_all_federal_awards(show_progress=True)
     pass

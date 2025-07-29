@@ -17,6 +17,17 @@ class APIError(Exception):
 
 
 #%%
+# Cache data class.
+class CacheData:
+    """"""
+    def __init__(self, file) -> None:
+        self.cache_file = file
+        self.cache_data = self._load_cache()
+    
+    def _load_cache(self) -> Dict:
+        """"""
+
+#%%
 # FAC API Client.
 class FACClient:
     """Basic client for interacting with the Federal Audit Clearinghouse API."""
@@ -52,10 +63,15 @@ class FACClient:
         self.min_audit_year = 2016
         self.max_audit_year = int(time.strftime('%Y'))
         self.all_auditee_states = [
-            'AK', 'AL', 'AR', 'AS', 'AZ', 'CA', 'CO', 'CT', 'DC', 'DE', 'FL', 'FM', 'GA', 'GU', 'HI', 'IA', 'ID'
-            , 'IL', 'IN', 'KS', 'KY', 'LA', 'MA', 'MD', 'ME', 'MH', 'MI', 'MN', 'MO', 'MP', 'MS', 'MT', 'NC', 'ND'
-            , 'NE', 'NH', 'NJ', 'NM', 'NV', 'NY', 'OH', 'OK', 'OR', 'PA', 'PR', 'PW', 'RI', 'SC', 'SD', 'TN', 'TX'
-            , 'UT', 'VA', 'VI', 'VT', 'WA', 'WI', 'WV', 'WY'
+            'AK', 'AL', 'AR', 'AS', 'AZ', 'CA', 'CO', 'CT', 'DC', 'DE', 'FL', 'FM', 'GA', 'GU', 'HI', 'IA', 'ID', 'IL', 'IN', 'KS'
+            , 'KY', 'LA', 'MA', 'MD', 'ME', 'MH', 'MI', 'MN', 'MO', 'MP', 'MS', 'MT', 'NC', 'ND', 'NE', 'NH', 'NJ', 'NM', 'NV', 'NY'
+            , 'OH', 'OK', 'OR', 'PA', 'PR', 'PW', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VA', 'VI', 'VT', 'WA', 'WI', 'WV', 'WY'
+        ]
+        self.all_agency_codes = [
+            '00', '01', '02', '03', '04', '05', '09', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22'
+            , '23', '24', '25', '26', '27', '28', '29', '31', '32', '33', '34', '36', '41', '45', '46', '47', '48', '49', '50', '51'
+            , '52', '54', '55', '56', '57', '59', '60', '61', '62', '63', '64', '65', '68', '69', '70', '71', '72', '73', '74', '75'
+            , '76', '78', '79', '80', '82', '83', '84', '85', '86', '88', '89', '90', '91', '93', '95', '96', '97', '98', '99'
         ]
 
     def _validate_string(self, input_string: str) -> str:
@@ -177,6 +193,22 @@ class FACClient:
         params = {}  # Initialize an empty dictionary for query parameters.
         if columns is not None:
             if isinstance(columns, list):
+                for col in columns:  # Validate that all columns input are allowed columns.
+                    allowed_columns = [  # List of allowed columns for the general endpoint.
+                        'report_id', 'auditee_uei', 'audit_year', 'auditee_certify_name', 'auditee_certify_title', 'auditee_contact_name', 'auditee_email'
+                        , 'auditee_name', 'auditee_phone', 'auditee_contact_title', 'auditee_address_line_1', 'auditee_city', 'auditee_state', 'auditee_ein'
+                        , 'auditee_zip', 'auditor_certify_name', 'auditor_certify_title', 'auditor_phone', 'auditor_state', 'auditor_city', 'auditor_contact_title'
+                        , 'auditor_address_line_1', 'auditor_zip', 'auditor_country', 'auditor_contact_name', 'auditor_email', 'auditor_firm_name'
+                        , 'auditor_foreign_address', 'auditor_ein', 'cognizant_agency', 'oversight_agency', 'date_created', 'ready_for_certification_date'
+                        , 'auditor_certified_date', 'auditee_certified_date', 'submitted_date', 'fac_accepted_date', 'fy_end_date', 'fy_start_date', 'audit_type'
+                        , 'gaap_results', 'sp_framework_basis', 'is_sp_framework_required', 'sp_framework_opinions', 'is_going_concern_included'
+                        , 'is_internal_control_deficiency_disclosed', 'is_internal_control_material_weakness_disclosed', 'is_material_noncompliance_disclosed'
+                        , 'dollar_threshold', 'is_low_risk_auditee', 'agencies_with_prior_findings', 'entity_type', 'number_months', 'audit_period_covered'
+                        , 'total_amount_expended', 'type_audit_code', 'is_public', 'data_source', 'is_aicpa_audit_guide_included', 'is_additional_ueis'
+                        , 'is_multiple_eins', 'is_secondary_auditors'
+                    ]
+                    if col.strip().lower() not in allowed_columns:
+                        raise ValueError(f"Invalid column name: {col}. Allowed columns: {', '.join(allowed_columns)}.")
                 params['select'] = ','.join(columns)
             else:
                 raise TypeError(f"columns must be a list, got {type(columns).__name__}.")
@@ -369,10 +401,11 @@ class FACClient:
 if __name__ == "__main__":
     # city = FACClient().get_general(auditee_city='Vacaville', auditee_state='CA')
     # print(city)
-    # report = FACClient().get_federal_awards(report_id='2023-06-GSAFAC-0000050078')
+    # report = FACClient().get_general(report_id='2023-06-GSAFAC-0000050078')
     # print(report)
-    # gen_results = FACClient().get_all_general(show_progress=True)
-    fed_results = FACClient().get_all_federal_awards(show_progress=True)
+    # gen_results = FACClient().get_all_general(columns=['report_id'], show_progress=True)
+    # fed_results = FACClient().get_all_federal_awards(show_progress=True)
+    pass
 
 
 #%%

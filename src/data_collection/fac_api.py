@@ -148,6 +148,7 @@ class FACClient:
                 break
 
     def get_general(self
+                    , columns: List[str] | None = None
                     , report_id: str | None = None
                     , auditee_uei: str | None = None
                     , auditee_ein: str | None = None
@@ -161,6 +162,7 @@ class FACClient:
         Purpose:
             Get request from \"general\" endpoint of the Federal Audit Clearinghouse API.
         Args:
+            columns: List of column names to select from the general endpoint. If None, all columns are returned.
             report_id: Specific SEFA report ID
             auditee_uei: UEI number tied to auditee
             auditee_ein: EIN number tied to auditee
@@ -169,12 +171,15 @@ class FACClient:
             auditee_state: State abbreviation where the auditee is located
             audit_year: Audit year of SEFA report, typically lagged by one calendar year
             handle_429: If True, automatically retry on 429 errors using Retry-After header
-            max_retries: Maximum number of retry attempts for 429 errors (only used if handle_429=True)
-            max_backoff: Maximum backoff delay in seconds (only used if handle_429=True)
         Returns:
             List of audit records from the general endpoint.
         """
         params = {}  # Initialize an empty dictionary for query parameters.
+        if columns is not None:
+            if isinstance(columns, list):
+                params['select'] = ','.join(columns)
+            else:
+                raise TypeError(f"columns must be a list, got {type(columns).__name__}.")
         if report_id is not None:
             params['report_id'] = f"eq.{report_id}"
         if auditee_uei is not None:
@@ -192,11 +197,12 @@ class FACClient:
         
         return self._make_request(endpoint_name='general', params=params, handle_429=handle_429)
 
-    def get_all_general(self, show_progress: bool = False) -> list[Dict]:
+    def get_all_general(self, columns: list[str] | None = None, show_progress: bool = False) -> list[Dict]:
         """
         Purpose:
             Collect all results from the \"general\" endpoint from the FAC database.
         Args:
+            columns: List of column names to select from the general endpoint. If None, all columns are returned.
             show_progress: Boolean value to print out results in the terminal for testing reasons.
         Returns:
             all_results: A list of all of the dictionary responses that are returned from the API.
@@ -209,7 +215,7 @@ class FACClient:
                 if show_progress:  # Print out the current year and state being processed.
                     print(f"Processing {year}-{state}...")
                 try:  # Exception handling for API calls.
-                    results = self.get_general(audit_year=year, auditee_state=state, handle_429=True)  # Get results for the current year and state.
+                    results = self.get_general(columns=columns, audit_year=year, auditee_state=state, handle_429=True)  # Get results for the current year and state.
                     all_results.extend(results)  # Add pulled results to the all_results list.
                 except APIError as e:
                     print(f"Error retrieving data for {year}-{state}: {e}")
@@ -218,6 +224,7 @@ class FACClient:
         return all_results
 
     def get_federal_awards(self
+                           , columns: List[str] | None = None
                            , report_id: str | None = None
                            , federal_agency_prefix: str | None = None
                            , federal_award_extension: str | None = None
@@ -230,17 +237,29 @@ class FACClient:
         Purpose:
             Get federal awards data for a specific report ID.
         Args:
+            columns: List of column names to select from the federal_awards endpoint. If None, all columns are returned.
             report_id: Specific SEFA report ID
+            federal_agency_prefix: Prefix of the federal agency. First two numbers of the federal assistance listing number.
+            federal_award_extension: Extension of the federal award. Remaining numbers of the federal assistance listing number. Should only be used along with federal_agency_prefix.
+            additional_award_identification: Additional award identification number
+            federal_program_name: Name of the federal program
+            cluster_name: Name of the cluster
+            handle_429: If True, automatically retry on 429 errors using Retry-After header
         Returns:
             List of federal awards records.
         """
         params = {}  # Initialize an empty dictionary for query parameters.
+        if columns is not None:
+            if isinstance(columns, list):
+                params['select'] = ','.join(columns)
+            else:
+                raise TypeError(f"columns must be a list, got {type(columns).__name__}.")
         if report_id is not None:
             params = {'report_id': f"eq.{report_id}"}
         if federal_agency_prefix is not None:
             params = {'federal_agency_prefix': f"eq.{federal_agency_prefix}"}
-        if federal_award_extension is not None:
-            params = {'federal_award_extension': f"eq.{federal_award_extension}"}
+            if federal_award_extension is not None:
+                params = {'federal_award_extension': f"eq.{federal_award_extension}"}
         if additional_award_identification is not None:
             params = {'additional_award_identification': f"eq.*{additional_award_identification}*"}
         if federal_program_name is not None:
@@ -250,11 +269,110 @@ class FACClient:
 
         return self._make_request(endpoint_name='federal_awards', params=params, handle_429=handle_429)
     
+    def get_all_federal_awards(self, batch_size: int = 250, show_progress: bool = False, save_progress: bool = False):
+        """
+        Purpose:
+            Retrieve all federal award records by batching report_ids from general endpoint.
+            This approach works around the federal_awards endpoint's limited filtering options.
+        Args:
+            batch_size: Number of report_ids to include in each API call (adjust to stay under 20K limit)
+            show_progress: Whether to print progress updates
+        Returns:
+            List of all federal award records
+        """
+        if show_progress:
+            print("Step 1: Getting all report_ids from general endpoint...")
+        
+        # Get all report id values from the general records
+        try:
+            report_id_records = self.get_all_general(columns=['report_id'], show_progress=show_progress)
+            if show_progress:
+                print(f"Retrieved {len(report_id_records)} report id records")
+            report_ids = list(set([record['report_id'] for record in report_id_records if 'report_id' in record]))  # Extract unique report_ids
+        except Exception as e:
+            raise APIError(f"Failed to get general records: {e}")
+        
+        if show_progress:
+            print(f"Step 2: Found {len(report_ids)} unique report_ids")
+            print(f"Step 3: Processing in batches of {batch_size}...")
+        
+        all_results = []
+        total_batches = (len(report_ids) + batch_size - 1) // batch_size  # Ceiling division
+
+        failed_batches = []
+    
+        for i in range(0, len(report_ids), batch_size):
+            batch_num = i // batch_size + 1
+            batch_ids = report_ids[i:i + batch_size]
+
+            if show_progress:
+                print(f"Processing batch {batch_num}/{total_batches} ({len(batch_ids)} report_ids)...")
+
+            # Add retry logic for network issues
+            max_retries = 3
+            retry_delay = 5  # seconds
+            batch_success = False
+
+            for attempt in range(max_retries):
+                try:
+                    # Create filter for this batch of report_ids
+                    # PostgREST syntax: report_id=in.(id1,id2,id3,...)
+                    id_filter = f"in.({','.join(batch_ids)})"
+
+                    params = {'report_id': id_filter}
+                    results = self._make_request(endpoint_name='federal_awards', params=params, handle_429=True)
+
+                    all_results.extend(results)
+                    batch_success = True
+
+                    if show_progress:
+                        print(f"  Found {len(results)} federal award records")
+
+                    break  # Success, exit retry loop
+
+                except APIError as e:
+                    if attempt < max_retries - 1:  # Not the last attempt
+                        if "Failed to connect" in str(e) or "Failed to resolve" in str(e) or "NameResolutionError" in str(e):
+                            if show_progress:
+                                print(f"  Network error on attempt {attempt + 1}, retrying in {retry_delay}s...")
+                            time.sleep(retry_delay)
+                            retry_delay *= 2  # Exponential backoff
+                            continue
+                        
+                    # Last attempt or non-network error
+                    if show_progress:
+                        print(f"  Error processing batch {batch_num} (attempt {attempt + 1}): {e}")
+                    break
+                
+            if not batch_success:
+                failed_batches.append((batch_num, batch_ids))
+
+            # Add small delay between batches to be nice to the API
+            if batch_num < total_batches:
+                time.sleep(0.5)
+
+            # Save progress periodically
+            if save_progress and batch_num % 100 == 0:
+                if show_progress:
+                    print(f"  Progress checkpoint: {len(all_results)} records collected so far")
+
+        if show_progress:
+            print(f"\nCompleted! Total federal award records retrieved: {len(all_results)}")
+            if failed_batches:
+                print(f"Warning: {len(failed_batches)} batches failed due to network issues")
+                print("You may want to retry those specific batches")
+
+    
 
 #%%
 # Test code.
 if __name__ == "__main__":
-    results = FACClient().get_all_general(show_progress=True)
+    # city = FACClient().get_general(auditee_city='Vacaville', auditee_state='CA')
+    # print(city)
+    # report = FACClient().get_federal_awards(report_id='2023-06-GSAFAC-0000050078')
+    # print(report)
+    # gen_results = FACClient().get_all_general(show_progress=True)
+    fed_results = FACClient().get_all_federal_awards(show_progress=True)
 
 
 #%%

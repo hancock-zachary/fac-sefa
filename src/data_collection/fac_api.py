@@ -360,13 +360,11 @@ class FACClient:
         
         all_results = []
         total_batches = (len(report_ids) + batch_size - 1) // batch_size  # Ceiling division
-
         failed_batches = []
     
         for i in range(0, len(report_ids), batch_size):
             batch_num = i // batch_size + 1
             batch_ids = report_ids[i:i + batch_size]
-
             if show_progress:
                 print(f"Processing batch {batch_num}/{total_batches} ({len(batch_ids)} report_ids)...")
 
@@ -374,22 +372,17 @@ class FACClient:
             max_retries = 3
             retry_delay = 5  # seconds
             batch_success = False
-
             for attempt in range(max_retries):
                 try:
                     # Create filter for this batch of report_ids
                     # PostgREST syntax: report_id=in.(id1,id2,id3,...)
                     id_filter = f"in.({','.join(batch_ids)})"
-
                     params = {'report_id': id_filter}
                     results = self._make_request(endpoint_name='federal_awards', params=params, handle_429=True)
-
                     all_results.extend(results)
                     batch_success = True
-
                     if show_progress:
                         print(f"  Found {len(results)} federal award records")
-
                     break  # Success, exit retry loop
 
                 except APIError as e:
@@ -409,12 +402,10 @@ class FACClient:
             if not batch_success:
                 failed_batches.append((batch_num, batch_ids))
 
-            # Add small delay between batches to be nice to the API
-            if batch_num < total_batches:
+            if batch_num < total_batches:  # Add small delay between batches to be nice to the API
                 time.sleep(0.5)
 
-            # Save progress periodically
-            if save_progress and batch_num % 100 == 0:
+            if save_progress and batch_num % 100 == 0:  # Save progress periodically
                 if show_progress:
                     print(f"  Progress checkpoint: {len(all_results)} records collected so far")
 
@@ -423,6 +414,8 @@ class FACClient:
             if failed_batches:
                 print(f"Warning: {len(failed_batches)} batches failed due to network issues")
                 print("You may want to retry those specific batches")
+        
+        return all_results
 
     def get_additional_eins(self
                             , columns: List[str] | None = None
@@ -449,7 +442,81 @@ class FACClient:
         return self._make_request(endpoint_name='additional_eins', params=params, handle_429=handle_429)
 
     def get_all_additional_eins(self, batch_size: int = 250, show_progress: bool = False, save_progress: bool = False):
-        pass
+        """"""
+        if show_progress:
+            print("Step 1: Getting all report_ids from general endpoint...")
+        
+        # Get all report id values from the general records
+        try:
+            report_id_records = self.get_all_general(columns=['report_id'], show_progress=show_progress)
+            if show_progress:
+                print(f"Retrieved {len(report_id_records)} report id records")
+            report_ids = list(set([record['report_id'] for record in report_id_records if 'report_id' in record]))  # Extract unique report_ids
+        except Exception as e:
+            raise APIError(f"Failed to get general records: {e}")
+        
+        if show_progress:
+            print(f"Step 2: Found {len(report_ids)} unique report_ids")
+            print(f"Step 3: Processing in batches of {batch_size}...")
+        
+        all_results = []
+        total_batches = (len(report_ids) + batch_size - 1) // batch_size  # Ceiling division
+        failed_batches = []
+    
+        for i in range(0, len(report_ids), batch_size):
+            batch_num = i // batch_size + 1
+            batch_ids = report_ids[i:i + batch_size]
+            if show_progress:
+                print(f"Processing batch {batch_num}/{total_batches} ({len(batch_ids)} report_ids)...")
+
+            # Add retry logic for network issues
+            max_retries = 3
+            retry_delay = 5  # seconds
+            batch_success = False
+            for attempt in range(max_retries):
+                try:
+                    # Create filter for this batch of report_ids
+                    # PostgREST syntax: report_id=in.(id1,id2,id3,...)
+                    id_filter = f"in.({','.join(batch_ids)})"
+                    params = {'report_id': id_filter}
+                    results = self._make_request(endpoint_name='additional_eins', params=params, handle_429=True)
+                    all_results.extend(results)
+                    batch_success = True
+                    if show_progress:
+                        print(f"  Found {len(results)} additional ein records")
+                    break  # Success, exit retry loop
+
+                except APIError as e:
+                    if attempt < max_retries - 1:  # Not the last attempt
+                        if "Failed to connect" in str(e) or "Failed to resolve" in str(e) or "NameResolutionError" in str(e):
+                            if show_progress:
+                                print(f"  Network error on attempt {attempt + 1}, retrying in {retry_delay}s...")
+                            time.sleep(retry_delay)
+                            retry_delay *= 2  # Exponential backoff
+                            continue
+                        
+                    # Last attempt or non-network error
+                    if show_progress:
+                        print(f"  Error processing batch {batch_num} (attempt {attempt + 1}): {e}")
+                    break
+                
+            if not batch_success:
+                failed_batches.append((batch_num, batch_ids))
+
+            if batch_num < total_batches:  # Add small delay between batches to be nice to the API
+                time.sleep(0.5)
+
+            if save_progress and batch_num % 100 == 0:  # Save progress periodically
+                if show_progress:
+                    print(f"  Progress checkpoint: {len(all_results)} records collected so far")
+
+        if show_progress:
+            print(f"\nCompleted! Total additional ein records retrieved: {len(all_results)}")
+            if failed_batches:
+                print(f"Warning: {len(failed_batches)} batches failed due to network issues")
+                print("You may want to retry those specific batches")
+        
+        return all_results
     
     def get_additional_ueis(self
                             , columns: List[str] | None = None
@@ -476,7 +543,81 @@ class FACClient:
         return self._make_request(endpoint_name='additional_ueis', params=params, handle_429=handle_429)
 
     def get_all_additional_ueis(self, batch_size: int = 250, show_progress: bool = False, save_progress: bool = False):
-        pass
+        """"""
+        if show_progress:
+            print("Step 1: Getting all report_ids from general endpoint...")
+        
+        # Get all report id values from the general records
+        try:
+            report_id_records = self.get_all_general(columns=['report_id'], show_progress=show_progress)
+            if show_progress:
+                print(f"Retrieved {len(report_id_records)} report id records")
+            report_ids = list(set([record['report_id'] for record in report_id_records if 'report_id' in record]))  # Extract unique report_ids
+        except Exception as e:
+            raise APIError(f"Failed to get general records: {e}")
+        
+        if show_progress:
+            print(f"Step 2: Found {len(report_ids)} unique report_ids")
+            print(f"Step 3: Processing in batches of {batch_size}...")
+        
+        all_results = []
+        total_batches = (len(report_ids) + batch_size - 1) // batch_size  # Ceiling division
+        failed_batches = []
+    
+        for i in range(0, len(report_ids), batch_size):
+            batch_num = i // batch_size + 1
+            batch_ids = report_ids[i:i + batch_size]
+            if show_progress:
+                print(f"Processing batch {batch_num}/{total_batches} ({len(batch_ids)} report_ids)...")
+
+            # Add retry logic for network issues
+            max_retries = 3
+            retry_delay = 5  # seconds
+            batch_success = False
+            for attempt in range(max_retries):
+                try:
+                    # Create filter for this batch of report_ids
+                    # PostgREST syntax: report_id=in.(id1,id2,id3,...)
+                    id_filter = f"in.({','.join(batch_ids)})"
+                    params = {'report_id': id_filter}
+                    results = self._make_request(endpoint_name='additional_ueis', params=params, handle_429=True)
+                    all_results.extend(results)
+                    batch_success = True
+                    if show_progress:
+                        print(f"  Found {len(results)} additional uei records")
+                    break  # Success, exit retry loop
+
+                except APIError as e:
+                    if attempt < max_retries - 1:  # Not the last attempt
+                        if "Failed to connect" in str(e) or "Failed to resolve" in str(e) or "NameResolutionError" in str(e):
+                            if show_progress:
+                                print(f"  Network error on attempt {attempt + 1}, retrying in {retry_delay}s...")
+                            time.sleep(retry_delay)
+                            retry_delay *= 2  # Exponential backoff
+                            continue
+                        
+                    # Last attempt or non-network error
+                    if show_progress:
+                        print(f"  Error processing batch {batch_num} (attempt {attempt + 1}): {e}")
+                    break
+                
+            if not batch_success:
+                failed_batches.append((batch_num, batch_ids))
+
+            if batch_num < total_batches:  # Add small delay between batches to be nice to the API
+                time.sleep(0.5)
+
+            if save_progress and batch_num % 100 == 0:  # Save progress periodically
+                if show_progress:
+                    print(f"  Progress checkpoint: {len(all_results)} records collected so far")
+
+        if show_progress:
+            print(f"\nCompleted! Total additional uei records retrieved: {len(all_results)}")
+            if failed_batches:
+                print(f"Warning: {len(failed_batches)} batches failed due to network issues")
+                print("You may want to retry those specific batches")
+        
+        return all_results
     
     def get_corrective_action_plans(self
                                     , columns: List[str] | None = None
@@ -513,7 +654,81 @@ class FACClient:
         return self._make_request(endpoint_name='corrective_action_plans', params=params, handle_429=handle_429)
 
     def get_all_corrective_action_plans(self, batch_size: int = 250, show_progress: bool = False, save_progress: bool = False):
-        pass
+        """"""
+        if show_progress:
+            print("Step 1: Getting all report_ids from general endpoint...")
+        
+        # Get all report id values from the general records
+        try:
+            report_id_records = self.get_all_general(columns=['report_id'], show_progress=show_progress)
+            if show_progress:
+                print(f"Retrieved {len(report_id_records)} report id records")
+            report_ids = list(set([record['report_id'] for record in report_id_records if 'report_id' in record]))  # Extract unique report_ids
+        except Exception as e:
+            raise APIError(f"Failed to get general records: {e}")
+        
+        if show_progress:
+            print(f"Step 2: Found {len(report_ids)} unique report_ids")
+            print(f"Step 3: Processing in batches of {batch_size}...")
+        
+        all_results = []
+        total_batches = (len(report_ids) + batch_size - 1) // batch_size  # Ceiling division
+        failed_batches = []
+    
+        for i in range(0, len(report_ids), batch_size):
+            batch_num = i // batch_size + 1
+            batch_ids = report_ids[i:i + batch_size]
+            if show_progress:
+                print(f"Processing batch {batch_num}/{total_batches} ({len(batch_ids)} report_ids)...")
+
+            # Add retry logic for network issues
+            max_retries = 3
+            retry_delay = 5  # seconds
+            batch_success = False
+            for attempt in range(max_retries):
+                try:
+                    # Create filter for this batch of report_ids
+                    # PostgREST syntax: report_id=in.(id1,id2,id3,...)
+                    id_filter = f"in.({','.join(batch_ids)})"
+                    params = {'report_id': id_filter}
+                    results = self._make_request(endpoint_name='corrective_action_plans', params=params, handle_429=True)
+                    all_results.extend(results)
+                    batch_success = True
+                    if show_progress:
+                        print(f"Found {len(results)} corrective action plan records")
+                    break  # Success, exit retry loop
+
+                except APIError as e:
+                    if attempt < max_retries - 1:  # Not the last attempt
+                        if "Failed to connect" in str(e) or "Failed to resolve" in str(e) or "NameResolutionError" in str(e):
+                            if show_progress:
+                                print(f"Network error on attempt {attempt + 1}, retrying in {retry_delay}s...")
+                            time.sleep(retry_delay)
+                            retry_delay *= 2  # Exponential backoff
+                            continue
+                        
+                    # Last attempt or non-network error
+                    if show_progress:
+                        print(f"Error processing batch {batch_num} (attempt {attempt + 1}): {e}")
+                    break
+                
+            if not batch_success:
+                failed_batches.append((batch_num, batch_ids))
+
+            if batch_num < total_batches:  # Add small delay between batches to be nice to the API
+                time.sleep(0.5)
+
+            if save_progress and batch_num % 100 == 0:  # Save progress periodically
+                if show_progress:
+                    print(f"Progress checkpoint: {len(all_results)} records collected so far")
+
+        if show_progress:
+            print(f"\nCompleted! Total corrective action plan records retrieved: {len(all_results)}")
+            if failed_batches:
+                print(f"Warning: {len(failed_batches)} batches failed due to network issues")
+                print("You may want to retry those specific batches")
+        
+        return all_results
     
     def get_findings(self
                      , columns: List[str] | None = None
@@ -558,7 +773,81 @@ class FACClient:
         return self._make_request(endpoint_name='findings', params=params, handle_429=handle_429)
 
     def get_all_findings(self, batch_size: int = 250, show_progress: bool = False, save_progress: bool = False):
-        pass
+        """"""
+        if show_progress:
+            print("Step 1: Getting all report_ids from general endpoint...")
+        
+        # Get all report id values from the general records
+        try:
+            report_id_records = self.get_all_general(columns=['report_id'], show_progress=show_progress)
+            if show_progress:
+                print(f"Retrieved {len(report_id_records)} report id records")
+            report_ids = list(set([record['report_id'] for record in report_id_records if 'report_id' in record]))  # Extract unique report_ids
+        except Exception as e:
+            raise APIError(f"Failed to get general records: {e}")
+        
+        if show_progress:
+            print(f"Step 2: Found {len(report_ids)} unique report_ids")
+            print(f"Step 3: Processing in batches of {batch_size}...")
+        
+        all_results = []
+        total_batches = (len(report_ids) + batch_size - 1) // batch_size  # Ceiling division
+        failed_batches = []
+    
+        for i in range(0, len(report_ids), batch_size):
+            batch_num = i // batch_size + 1
+            batch_ids = report_ids[i:i + batch_size]
+            if show_progress:
+                print(f"Processing batch {batch_num}/{total_batches} ({len(batch_ids)} report_ids)...")
+
+            # Add retry logic for network issues
+            max_retries = 3
+            retry_delay = 5  # seconds
+            batch_success = False
+            for attempt in range(max_retries):
+                try:
+                    # Create filter for this batch of report_ids
+                    # PostgREST syntax: report_id=in.(id1,id2,id3,...)
+                    id_filter = f"in.({','.join(batch_ids)})"
+                    params = {'report_id': id_filter}
+                    results = self._make_request(endpoint_name='findings', params=params, handle_429=True)
+                    all_results.extend(results)
+                    batch_success = True
+                    if show_progress:
+                        print(f"  Found {len(results)} finding records")
+                    break  # Success, exit retry loop
+
+                except APIError as e:
+                    if attempt < max_retries - 1:  # Not the last attempt
+                        if "Failed to connect" in str(e) or "Failed to resolve" in str(e) or "NameResolutionError" in str(e):
+                            if show_progress:
+                                print(f"Network error on attempt {attempt + 1}, retrying in {retry_delay}s...")
+                            time.sleep(retry_delay)
+                            retry_delay *= 2  # Exponential backoff
+                            continue
+                        
+                    # Last attempt or non-network error
+                    if show_progress:
+                        print(f"Error processing batch {batch_num} (attempt {attempt + 1}): {e}")
+                    break
+                
+            if not batch_success:
+                failed_batches.append((batch_num, batch_ids))
+
+            if batch_num < total_batches:  # Add small delay between batches to be nice to the API
+                time.sleep(0.5)
+
+            if save_progress and batch_num % 100 == 0:  # Save progress periodically
+                if show_progress:
+                    print(f"Progress checkpoint: {len(all_results)} records collected so far")
+
+        if show_progress:
+            print(f"\nCompleted! Total findings records retrieved: {len(all_results)}")
+            if failed_batches:
+                print(f"Warning: {len(failed_batches)} batches failed due to network issues")
+                print("You may want to retry those specific batches")
+        
+        return all_results
     
     def get_findings_text(self
                           , columns: List[str] | None = None
@@ -595,7 +884,81 @@ class FACClient:
         return self._make_request(endpoint_name='findings_text', params=params, handle_429=handle_429)
 
     def get_all_findings_text(self, batch_size: int = 250, show_progress: bool = False, save_progress: bool = False):
-        pass
+        """"""
+        if show_progress:
+            print("Step 1: Getting all report_ids from general endpoint...")
+        
+        # Get all report id values from the general records
+        try:
+            report_id_records = self.get_all_general(columns=['report_id'], show_progress=show_progress)
+            if show_progress:
+                print(f"Retrieved {len(report_id_records)} report id records")
+            report_ids = list(set([record['report_id'] for record in report_id_records if 'report_id' in record]))  # Extract unique report_ids
+        except Exception as e:
+            raise APIError(f"Failed to get general records: {e}")
+        
+        if show_progress:
+            print(f"Step 2: Found {len(report_ids)} unique report_ids")
+            print(f"Step 3: Processing in batches of {batch_size}...")
+        
+        all_results = []
+        total_batches = (len(report_ids) + batch_size - 1) // batch_size  # Ceiling division
+        failed_batches = []
+    
+        for i in range(0, len(report_ids), batch_size):
+            batch_num = i // batch_size + 1
+            batch_ids = report_ids[i:i + batch_size]
+            if show_progress:
+                print(f"Processing batch {batch_num}/{total_batches} ({len(batch_ids)} report_ids)...")
+
+            # Add retry logic for network issues
+            max_retries = 3
+            retry_delay = 5  # seconds
+            batch_success = False
+            for attempt in range(max_retries):
+                try:
+                    # Create filter for this batch of report_ids
+                    # PostgREST syntax: report_id=in.(id1,id2,id3,...)
+                    id_filter = f"in.({','.join(batch_ids)})"
+                    params = {'report_id': id_filter}
+                    results = self._make_request(endpoint_name='findings_text', params=params, handle_429=True)
+                    all_results.extend(results)
+                    batch_success = True
+                    if show_progress:
+                        print(f"Found {len(results)} findings text records")
+                    break  # Success, exit retry loop
+
+                except APIError as e:
+                    if attempt < max_retries - 1:  # Not the last attempt
+                        if "Failed to connect" in str(e) or "Failed to resolve" in str(e) or "NameResolutionError" in str(e):
+                            if show_progress:
+                                print(f"Network error on attempt {attempt + 1}, retrying in {retry_delay}s...")
+                            time.sleep(retry_delay)
+                            retry_delay *= 2  # Exponential backoff
+                            continue
+                        
+                    # Last attempt or non-network error
+                    if show_progress:
+                        print(f"Error processing batch {batch_num} (attempt {attempt + 1}): {e}")
+                    break
+                
+            if not batch_success:
+                failed_batches.append((batch_num, batch_ids))
+
+            if batch_num < total_batches:  # Add small delay between batches to be nice to the API
+                time.sleep(0.5)
+
+            if save_progress and batch_num % 100 == 0:  # Save progress periodically
+                if show_progress:
+                    print(f"Progress checkpoint: {len(all_results)} records collected so far")
+
+        if show_progress:
+            print(f"\nCompleted! Total findings text records retrieved: {len(all_results)}")
+            if failed_batches:
+                print(f"Warning: {len(failed_batches)} batches failed due to network issues")
+                print("You may want to retry those specific batches")
+        
+        return all_results
     
     def get_notes_to_sefa(self
                           , columns: List[str] | None = None
@@ -635,7 +998,81 @@ class FACClient:
         return self._make_request(endpoint_name='notes_to_sefa', params=params, handle_429=handle_429)
 
     def get_all_notes_to_sefa(self, batch_size: int = 250, show_progress: bool = False, save_progress: bool = False):
-        pass
+        """"""
+        if show_progress:
+            print("Step 1: Getting all report_ids from general endpoint...")
+        
+        # Get all report id values from the general records
+        try:
+            report_id_records = self.get_all_general(columns=['report_id'], show_progress=show_progress)
+            if show_progress:
+                print(f"Retrieved {len(report_id_records)} report id records")
+            report_ids = list(set([record['report_id'] for record in report_id_records if 'report_id' in record]))  # Extract unique report_ids
+        except Exception as e:
+            raise APIError(f"Failed to get general records: {e}")
+        
+        if show_progress:
+            print(f"Step 2: Found {len(report_ids)} unique report_ids")
+            print(f"Step 3: Processing in batches of {batch_size}...")
+        
+        all_results = []
+        total_batches = (len(report_ids) + batch_size - 1) // batch_size  # Ceiling division
+        failed_batches = []
+    
+        for i in range(0, len(report_ids), batch_size):
+            batch_num = i // batch_size + 1
+            batch_ids = report_ids[i:i + batch_size]
+            if show_progress:
+                print(f"Processing batch {batch_num}/{total_batches} ({len(batch_ids)} report_ids)...")
+
+            # Add retry logic for network issues
+            max_retries = 3
+            retry_delay = 5  # seconds
+            batch_success = False
+            for attempt in range(max_retries):
+                try:
+                    # Create filter for this batch of report_ids
+                    # PostgREST syntax: report_id=in.(id1,id2,id3,...)
+                    id_filter = f"in.({','.join(batch_ids)})"
+                    params = {'report_id': id_filter}
+                    results = self._make_request(endpoint_name='notes_to_sefa', params=params, handle_429=True)
+                    all_results.extend(results)
+                    batch_success = True
+                    if show_progress:
+                        print(f"Found {len(results)} note to sefa records")
+                    break  # Success, exit retry loop
+
+                except APIError as e:
+                    if attempt < max_retries - 1:  # Not the last attempt
+                        if "Failed to connect" in str(e) or "Failed to resolve" in str(e) or "NameResolutionError" in str(e):
+                            if show_progress:
+                                print(f"Network error on attempt {attempt + 1}, retrying in {retry_delay}s...")
+                            time.sleep(retry_delay)
+                            retry_delay *= 2  # Exponential backoff
+                            continue
+                        
+                    # Last attempt or non-network error
+                    if show_progress:
+                        print(f"Error processing batch {batch_num} (attempt {attempt + 1}): {e}")
+                    break
+                
+            if not batch_success:
+                failed_batches.append((batch_num, batch_ids))
+
+            if batch_num < total_batches:  # Add small delay between batches to be nice to the API
+                time.sleep(0.5)
+
+            if save_progress and batch_num % 100 == 0:  # Save progress periodically
+                if show_progress:
+                    print(f"Progress checkpoint: {len(all_results)} records collected so far")
+
+        if show_progress:
+            print(f"\nCompleted! Total note to sefa records retrieved: {len(all_results)}")
+            if failed_batches:
+                print(f"Warning: {len(failed_batches)} batches failed due to network issues")
+                print("You may want to retry those specific batches")
+        
+        return all_results
     
     def get_passthrough(self
                         , columns: List[str] | None = None
@@ -676,7 +1113,81 @@ class FACClient:
         return self._make_request(endpoint_name='passthrough', params=params, handle_429=handle_429)
 
     def get_all_passthrough(self, batch_size: int = 250, show_progress: bool = False, save_progress: bool = False):
-        pass
+        """"""
+        if show_progress:
+            print("Step 1: Getting all report_ids from general endpoint...")
+        
+        # Get all report id values from the general records
+        try:
+            report_id_records = self.get_all_general(columns=['report_id'], show_progress=show_progress)
+            if show_progress:
+                print(f"Retrieved {len(report_id_records)} report id records")
+            report_ids = list(set([record['report_id'] for record in report_id_records if 'report_id' in record]))  # Extract unique report_ids
+        except Exception as e:
+            raise APIError(f"Failed to get general records: {e}")
+        
+        if show_progress:
+            print(f"Step 2: Found {len(report_ids)} unique report_ids")
+            print(f"Step 3: Processing in batches of {batch_size}...")
+        
+        all_results = []
+        total_batches = (len(report_ids) + batch_size - 1) // batch_size  # Ceiling division
+        failed_batches = []
+    
+        for i in range(0, len(report_ids), batch_size):
+            batch_num = i // batch_size + 1
+            batch_ids = report_ids[i:i + batch_size]
+            if show_progress:
+                print(f"Processing batch {batch_num}/{total_batches} ({len(batch_ids)} report_ids)...")
+
+            # Add retry logic for network issues
+            max_retries = 3
+            retry_delay = 5  # seconds
+            batch_success = False
+            for attempt in range(max_retries):
+                try:
+                    # Create filter for this batch of report_ids
+                    # PostgREST syntax: report_id=in.(id1,id2,id3,...)
+                    id_filter = f"in.({','.join(batch_ids)})"
+                    params = {'report_id': id_filter}
+                    results = self._make_request(endpoint_name='passthrough', params=params, handle_429=True)
+                    all_results.extend(results)
+                    batch_success = True
+                    if show_progress:
+                        print(f"  Found {len(results)} passthrough records")
+                    break  # Success, exit retry loop
+
+                except APIError as e:
+                    if attempt < max_retries - 1:  # Not the last attempt
+                        if "Failed to connect" in str(e) or "Failed to resolve" in str(e) or "NameResolutionError" in str(e):
+                            if show_progress:
+                                print(f"  Network error on attempt {attempt + 1}, retrying in {retry_delay}s...")
+                            time.sleep(retry_delay)
+                            retry_delay *= 2  # Exponential backoff
+                            continue
+                        
+                    # Last attempt or non-network error
+                    if show_progress:
+                        print(f"  Error processing batch {batch_num} (attempt {attempt + 1}): {e}")
+                    break
+                
+            if not batch_success:
+                failed_batches.append((batch_num, batch_ids))
+
+            if batch_num < total_batches:  # Add small delay between batches to be nice to the API
+                time.sleep(0.5)
+
+            if save_progress and batch_num % 100 == 0:  # Save progress periodically
+                if show_progress:
+                    print(f"  Progress checkpoint: {len(all_results)} records collected so far")
+
+        if show_progress:
+            print(f"\nCompleted! Total passthrough records retrieved: {len(all_results)}")
+            if failed_batches:
+                print(f"Warning: {len(failed_batches)} batches failed due to network issues")
+                print("You may want to retry those specific batches")
+        
+        return all_results
     
     def get_secondary_auditors(self
                                , columns: List[str] | None = None
@@ -721,7 +1232,81 @@ class FACClient:
         return self._make_request(endpoint_name='secondary_auditors', params=params, handle_429=handle_429)
 
     def get_all_secondary_auditors(self, batch_size: int = 250, show_progress: bool = False, save_progress: bool = False):
-        pass
+        """"""
+        if show_progress:
+            print("Step 1: Getting all report_ids from general endpoint...")
+        
+        # Get all report id values from the general records
+        try:
+            report_id_records = self.get_all_general(columns=['report_id'], show_progress=show_progress)
+            if show_progress:
+                print(f"Retrieved {len(report_id_records)} report id records")
+            report_ids = list(set([record['report_id'] for record in report_id_records if 'report_id' in record]))  # Extract unique report_ids
+        except Exception as e:
+            raise APIError(f"Failed to get general records: {e}")
+        
+        if show_progress:
+            print(f"Step 2: Found {len(report_ids)} unique report_ids")
+            print(f"Step 3: Processing in batches of {batch_size}...")
+        
+        all_results = []
+        total_batches = (len(report_ids) + batch_size - 1) // batch_size  # Ceiling division
+        failed_batches = []
+    
+        for i in range(0, len(report_ids), batch_size):
+            batch_num = i // batch_size + 1
+            batch_ids = report_ids[i:i + batch_size]
+            if show_progress:
+                print(f"Processing batch {batch_num}/{total_batches} ({len(batch_ids)} report_ids)...")
+
+            # Add retry logic for network issues
+            max_retries = 3
+            retry_delay = 5  # seconds
+            batch_success = False
+            for attempt in range(max_retries):
+                try:
+                    # Create filter for this batch of report_ids
+                    # PostgREST syntax: report_id=in.(id1,id2,id3,...)
+                    id_filter = f"in.({','.join(batch_ids)})"
+                    params = {'report_id': id_filter}
+                    results = self._make_request(endpoint_name='secondary_auditors', params=params, handle_429=True)
+                    all_results.extend(results)
+                    batch_success = True
+                    if show_progress:
+                        print(f"  Found {len(results)} secondary auditors records")
+                    break  # Success, exit retry loop
+
+                except APIError as e:
+                    if attempt < max_retries - 1:  # Not the last attempt
+                        if "Failed to connect" in str(e) or "Failed to resolve" in str(e) or "NameResolutionError" in str(e):
+                            if show_progress:
+                                print(f"  Network error on attempt {attempt + 1}, retrying in {retry_delay}s...")
+                            time.sleep(retry_delay)
+                            retry_delay *= 2  # Exponential backoff
+                            continue
+                        
+                    # Last attempt or non-network error
+                    if show_progress:
+                        print(f"  Error processing batch {batch_num} (attempt {attempt + 1}): {e}")
+                    break
+                
+            if not batch_success:
+                failed_batches.append((batch_num, batch_ids))
+
+            if batch_num < total_batches:  # Add small delay between batches to be nice to the API
+                time.sleep(0.5)
+
+            if save_progress and batch_num % 100 == 0:  # Save progress periodically
+                if show_progress:
+                    print(f"  Progress checkpoint: {len(all_results)} records collected so far")
+
+        if show_progress:
+            print(f"\nCompleted! Total secondary auditor records retrieved: {len(all_results)}")
+            if failed_batches:
+                print(f"Warning: {len(failed_batches)} batches failed due to network issues")
+                print("You may want to retry those specific batches")
+        
+        return all_results
 
 #%%
 # Test code.

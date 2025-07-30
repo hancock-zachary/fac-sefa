@@ -251,32 +251,6 @@ class FACClient:
         
         return self._make_request(endpoint_name='general', params=params, handle_429=handle_429)
 
-    def get_all_general(self, columns: list[str] | None = None, show_progress: bool = False) -> list[Dict]:
-        """
-        Purpose:
-            Collect all results from the \"general\" endpoint from the FAC database.
-        Args:
-            columns: List of column names to select from the general endpoint. If None, all columns are returned.
-            show_progress: Boolean value to print out results in the terminal for testing reasons.
-        Returns:
-            all_results: A list of all of the dictionary responses that are returned from the API.
-        """
-        all_results = []  # Store all queried results from the FAC database.
-        
-        # The max number of results that can be pulled from the API is 20,000 results. Looping over time and states ensures no call asks for too many records.
-        for year in range(self.min_audit_year, self.max_audit_year + 1):  # Loop from 2016 to the current year.
-            for state in self.all_auditee_states:  # Loop across all states.
-                if show_progress:  # Print out the current year and state being processed.
-                    print(f"Processing {year}-{state}...")
-                try:  # Exception handling for API calls.
-                    results = self.get_general(columns=columns, audit_year=year, auditee_state=state, handle_429=True)  # Get results for the current year and state.
-                    all_results.extend(results)  # Add pulled results to the all_results list.
-                except APIError as e:
-                    print(f"Error retrieving data for {year}-{state}: {e}")
-        if show_progress:  # Return the total number of records retrieved.
-            print(f"Total records retrieved: {len(all_results)}")
-        return all_results
-    
     def get_federal_awards(self
                            , columns: List[str] | None = None
                            , report_id: str | None = None
@@ -330,6 +304,307 @@ class FACClient:
             params = {'cluster_name': f"ilike.*{cluster_name}*"}
 
         return self._make_request(endpoint_name='federal_awards', params=params, handle_429=handle_429)
+    
+    def get_additional_eins(self
+                            , columns: List[str] | None = None
+                            , report_id: str | None = None
+                            , audit_year: int | None = None
+                            , handle_429: bool = False
+                            ) -> List[Dict]:
+        """"""
+        params = {}  # Initialize an empty dictionary for query parameters.
+        if columns is not None:
+            if isinstance(columns, list):
+                for col in columns:  # Validate that all columns input are allowed columns.
+                    allowed_columns = ['report_id', 'auditee_uei', 'audit_year', 'additional_ein']  # List of allowed columns for the general endpoint.
+                    if col.strip().lower() not in allowed_columns:
+                        raise ValueError(f"Invalid column name: {col}. Allowed columns: {', '.join(allowed_columns)}.")
+                params['select'] = ','.join(columns)
+            else:
+                raise TypeError(f"columns must be a list, got {type(columns).__name__}.")
+        if report_id is not None:
+            params['report_id'] = f"eq.{report_id}"
+        if audit_year is not None:
+            params['audit_year'] = f"eq.{audit_year}"
+        
+        return self._make_request(endpoint_name='additional_eins', params=params, handle_429=handle_429)
+
+    def get_additional_ueis(self
+                            , columns: List[str] | None = None
+                            , report_id: str | None = None
+                            , audit_year: int | None = None
+                            , handle_429: bool = False
+                            ) -> List[Dict]:
+        """"""
+        params = {}  # Initialize an empty dictionary for query parameters.
+        if columns is not None:
+            if isinstance(columns, list):
+                for col in columns:  # Validate that all columns input are allowed columns.
+                    allowed_columns = ['report_id', 'auditee_uei', 'audit_year', 'additional_uei']  # List of allowed columns for the general endpoint.
+                    if col.strip().lower() not in allowed_columns:
+                        raise ValueError(f"Invalid column name: {col}. Allowed columns: {', '.join(allowed_columns)}.")
+                params['select'] = ','.join(columns)
+            else:
+                raise TypeError(f"columns must be a list, got {type(columns).__name__}.")
+        if report_id is not None:
+            params['report_id'] = f"eq.{report_id}"
+        if audit_year is not None:
+            params['audit_year'] = f"eq.{audit_year}"
+        
+        return self._make_request(endpoint_name='additional_ueis', params=params, handle_429=handle_429)
+
+    def get_corrective_action_plans(self
+                                    , columns: List[str] | None = None
+                                    , report_id: str | None = None
+                                    , auditee_uei: str | None = None
+                                    , audit_year: int | None = None
+                                    , handle_429: bool = False
+                                    ):
+        """"""
+        params = {}  # Initialize an empty dictionary for query parameters.
+        if columns is not None:
+            if isinstance(columns, list):
+                for col in columns:  # Validate that all columns input are allowed columns.
+                    allowed_columns = [  # List of allowed columns for the general endpoint.
+                        'report_id'
+                        , 'auditee_uei'
+                        , 'audit_year'
+                        , 'finding_ref_number'
+                        , 'contains_chart_or_table'
+                        , 'planned_action'
+                    ]
+                    if col.strip().lower() not in allowed_columns:
+                        raise ValueError(f"Invalid column name: {col}. Allowed columns: {', '.join(allowed_columns)}.")
+                params['select'] = ','.join(columns)
+            else:
+                raise TypeError(f"columns must be a list, got {type(columns).__name__}.")
+        if report_id is not None:
+            params['report_id'] = f"eq.{report_id}"
+        if auditee_uei is not None:
+            params['auditee_uei'] = f"eq.{auditee_uei}"
+        if audit_year is not None:
+            params['audit_year'] = f"eq.{audit_year}"
+        
+        return self._make_request(endpoint_name='corrective_action_plans', params=params, handle_429=handle_429)
+
+    def get_findings(self
+                     , columns: List[str] | None = None
+                     , report_id: str | None = None
+                     , auditee_uei: str | None = None
+                     , audit_year: int | None = None
+                     , handle_429: bool = False
+                     ) -> List[Dict]:
+        """"""
+        params = {}  # Initialize an empty dictionary for query parameters.
+        if columns is not None:
+            if isinstance(columns, list):
+                for col in columns:  # Validate that all columns input are allowed columns.
+                    allowed_columns = [  # List of allowed columns for the general endpoint.
+                        'report_id'
+                        , 'auditee_uei'
+                        , 'audit_year'
+                        , 'award_reference'
+                        , 'reference_number'
+                        , 'is_material_weakness'
+                        , 'is_modified_opinion'
+                        , 'is_other_findings'
+                        , 'is_other_matters'
+                        , 'prior_finding_ref_numbers'
+                        , 'is_questioned_costs'
+                        , 'is_repeat_finding'
+                        , 'is_significant_deficiency'
+                        , 'type_requirement'
+                    ]
+                    if col.strip().lower() not in allowed_columns:
+                        raise ValueError(f"Invalid column name: {col}. Allowed columns: {', '.join(allowed_columns)}.")
+                params['select'] = ','.join(columns)
+            else:
+                raise TypeError(f"columns must be a list, got {type(columns).__name__}.")
+        if report_id is not None:
+            params['report_id'] = f"eq.{report_id}"
+        if auditee_uei is not None:
+            params['auditee_uei'] = f"eq.{auditee_uei}"
+        if audit_year is not None:
+            params['audit_year'] = f"eq.{audit_year}"
+        
+        return self._make_request(endpoint_name='findings', params=params, handle_429=handle_429)
+
+    def get_findings_text(self
+                          , columns: List[str] | None = None
+                          , report_id: str | None = None
+                          , auditee_uei: str | None = None
+                          , audit_year: int | None = None
+                          , handle_429: bool = False
+                          ) -> List[Dict]:
+        """"""
+        params = {}  # Initialize an empty dictionary for query parameters.
+        if columns is not None:
+            if isinstance(columns, list):
+                for col in columns:  # Validate that all columns input are allowed columns.
+                    allowed_columns = [  # List of allowed columns for the general endpoint.
+                        'report_id'
+                        , 'auditee_uei'
+                        , 'audit_year'
+                        , 'finding_ref_number'
+                        , 'contains_chart_or_table'
+                        , 'finding_text'
+                    ]
+                    if col.strip().lower() not in allowed_columns:
+                        raise ValueError(f"Invalid column name: {col}. Allowed columns: {', '.join(allowed_columns)}.")
+                params['select'] = ','.join(columns)
+            else:
+                raise TypeError(f"columns must be a list, got {type(columns).__name__}.")
+        if report_id is not None:
+            params['report_id'] = f"eq.{report_id}"
+        if auditee_uei is not None:
+            params['auditee_uei'] = f"eq.{auditee_uei}"
+        if audit_year is not None:
+            params['audit_year'] = f"eq.{audit_year}"
+        
+        return self._make_request(endpoint_name='findings_text', params=params, handle_429=handle_429)
+
+    def get_notes_to_sefa(self
+                          , columns: List[str] | None = None
+                          , report_id: str | None = None
+                          , auditee_uei: str | None = None
+                          , audit_year: int | None = None
+                          , handle_429: bool = False
+                          ) -> List[Dict]:
+        """"""
+        params = {}  # Initialize an empty dictionary for query parameters.
+        if columns is not None:
+            if isinstance(columns, list):
+                for col in columns:  # Validate that all columns input are allowed columns.
+                    allowed_columns = [  # List of allowed columns for the general endpoint.
+                        'report_id'
+                        , 'auditee_uei'
+                        , 'audit_year'
+                        , 'title'
+                        , 'accounting_policies'
+                        , 'is_minimis_rate_used'
+                        , 'rate_explained'
+                        , 'content'
+                        , 'contains_chart_or_table'
+                    ]
+                    if col.strip().lower() not in allowed_columns:
+                        raise ValueError(f"Invalid column name: {col}. Allowed columns: {', '.join(allowed_columns)}.")
+                params['select'] = ','.join(columns)
+            else:
+                raise TypeError(f"columns must be a list, got {type(columns).__name__}.")
+        if report_id is not None:
+            params['report_id'] = f"eq.{report_id}"
+        if auditee_uei is not None:
+            params['auditee_uei'] = f"eq.{auditee_uei}"
+        if audit_year is not None:
+            params['audit_year'] = f"eq.{audit_year}"
+        
+        return self._make_request(endpoint_name='notes_to_sefa', params=params, handle_429=handle_429)
+
+    def get_passthrough(self
+                        , columns: List[str] | None = None
+                        , report_id: str | None = None
+                        , auditee_uei: str | None = None
+                        , audit_year: int | None = None
+                        , passthrough_id: str | None = None
+                        , handle_429: bool = False
+                        ) -> List[Dict]:
+        """
+        """
+        params = {}  # Initialize an empty dictionary for query parameters.
+        if columns is not None:
+            if isinstance(columns, list):
+                for col in columns:  # Validate that all columns input are allowed columns.
+                    allowed_columns = [  # List of allowed columns for the general endpoint.
+                        'report_id'
+                        , 'auditee_uei'
+                        , 'audit_year'
+                        , 'award_reference'
+                        , 'passthrough_id'
+                        , 'passthrough_name'
+                    ]
+                    if col.strip().lower() not in allowed_columns:
+                        raise ValueError(f"Invalid column name: {col}. Allowed columns: {', '.join(allowed_columns)}.")
+                params['select'] = ','.join(columns)
+            else:
+                raise TypeError(f"columns must be a list, got {type(columns).__name__}.")
+        if report_id is not None:
+            params['report_id'] = f"eq.{report_id}"
+        if auditee_uei is not None:
+            params['auditee_uei'] = f"eq.{auditee_uei}"
+        if audit_year is not None:
+            params['audit_year'] = f"eq.{audit_year}"
+        if passthrough_id is not None:
+            params['passthrough_id'] = f"eq.{passthrough_id}"
+        
+        return self._make_request(endpoint_name='passthrough', params=params, handle_429=handle_429)
+
+    def get_secondary_auditors(self
+                               , columns: List[str] | None = None
+                               , report_id: str | None = None
+                               , auditee_uei: str | None = None
+                               , audit_year: int | None = None
+                               , handle_429: bool = False
+                               ) -> List[Dict]:
+        """
+        """
+        params = {}  # Initialize an empty dictionary for query parameters.
+        if columns is not None:
+            if isinstance(columns, list):
+                for col in columns:  # Validate that all columns input are allowed columns.
+                    allowed_columns = [  # List of allowed columns for the general endpoint.
+                        'report_id'
+                        , 'auditee_uei'
+                        , 'audit_year'
+                        , 'auditor_ein'
+                        , 'auditor_name'
+                        , 'contact_name'
+                        , 'contact_title'
+                        , 'contact_email'
+                        , 'contact_phone'
+                        , 'address_street'
+                        , 'address_city'
+                        , 'address_state'
+                        , 'address_zipcode'
+                    ]
+                    if col.strip().lower() not in allowed_columns:
+                        raise ValueError(f"Invalid column name: {col}. Allowed columns: {', '.join(allowed_columns)}.")
+                params['select'] = ','.join(columns)
+            else:
+                raise TypeError(f"columns must be a list, got {type(columns).__name__}.")
+        if report_id is not None:
+            params['report_id'] = f"eq.{report_id}"
+        if auditee_uei is not None:
+            params['auditee_uei'] = f"eq.{auditee_uei}"
+        if audit_year is not None:
+            params['audit_year'] = f"eq.{audit_year}"
+        
+        return self._make_request(endpoint_name='secondary_auditors', params=params, handle_429=handle_429)
+
+    def get_all_general(self, columns: list[str] | None = None, show_progress: bool = False) -> list[Dict]:
+        """
+        Purpose:
+            Collect all results from the \"general\" endpoint from the FAC database.
+        Args:
+            columns: List of column names to select from the general endpoint. If None, all columns are returned.
+            show_progress: Boolean value to print out results in the terminal for testing reasons.
+        Returns:
+            all_results: A list of all of the dictionary responses that are returned from the API.
+        """
+        all_results = []  # Store all queried results from the FAC database.
+        
+        # The max number of results that can be pulled from the API is 20,000 results. Looping over time and states ensures no call asks for too many records.
+        for year in range(self.min_audit_year, self.max_audit_year + 1):  # Loop from 2016 to the current year.
+            for state in self.all_auditee_states:  # Loop across all states.
+                if show_progress:  # Print out the current year and state being processed.
+                    print(f"Processing {year}-{state}...")
+                try:  # Exception handling for API calls.
+                    results = self.get_general(columns=columns, audit_year=year, auditee_state=state, handle_429=True)  # Get results for the current year and state.
+                    all_results.extend(results)  # Add pulled results to the all_results list.
+                except APIError as e:
+                    print(f"Error retrieving data for {year}-{state}: {e}")
+        if show_progress:  # Return the total number of records retrieved.
+            print(f"Total records retrieved: {len(all_results)}")
+        return all_results
     
     def get_all_federal_awards(self, batch_size: int = 250, show_progress: bool = False, save_progress: bool = False):
         """
@@ -417,30 +692,6 @@ class FACClient:
         
         return all_results
 
-    def get_additional_eins(self
-                            , columns: List[str] | None = None
-                            , report_id: str | None = None
-                            , audit_year: int | None = None
-                            , handle_429: bool = False
-                            ) -> List[Dict]:
-        """"""
-        params = {}  # Initialize an empty dictionary for query parameters.
-        if columns is not None:
-            if isinstance(columns, list):
-                for col in columns:  # Validate that all columns input are allowed columns.
-                    allowed_columns = ['report_id', 'auditee_uei', 'audit_year', 'additional_ein']  # List of allowed columns for the general endpoint.
-                    if col.strip().lower() not in allowed_columns:
-                        raise ValueError(f"Invalid column name: {col}. Allowed columns: {', '.join(allowed_columns)}.")
-                params['select'] = ','.join(columns)
-            else:
-                raise TypeError(f"columns must be a list, got {type(columns).__name__}.")
-        if report_id is not None:
-            params['report_id'] = f"eq.{report_id}"
-        if audit_year is not None:
-            params['audit_year'] = f"eq.{audit_year}"
-        
-        return self._make_request(endpoint_name='additional_eins', params=params, handle_429=handle_429)
-
     def get_all_additional_eins(self, batch_size: int = 250, show_progress: bool = False, save_progress: bool = False):
         """"""
         if show_progress:
@@ -518,30 +769,6 @@ class FACClient:
         
         return all_results
     
-    def get_additional_ueis(self
-                            , columns: List[str] | None = None
-                            , report_id: str | None = None
-                            , audit_year: int | None = None
-                            , handle_429: bool = False
-                            ) -> List[Dict]:
-        """"""
-        params = {}  # Initialize an empty dictionary for query parameters.
-        if columns is not None:
-            if isinstance(columns, list):
-                for col in columns:  # Validate that all columns input are allowed columns.
-                    allowed_columns = ['report_id', 'auditee_uei', 'audit_year', 'additional_uei']  # List of allowed columns for the general endpoint.
-                    if col.strip().lower() not in allowed_columns:
-                        raise ValueError(f"Invalid column name: {col}. Allowed columns: {', '.join(allowed_columns)}.")
-                params['select'] = ','.join(columns)
-            else:
-                raise TypeError(f"columns must be a list, got {type(columns).__name__}.")
-        if report_id is not None:
-            params['report_id'] = f"eq.{report_id}"
-        if audit_year is not None:
-            params['audit_year'] = f"eq.{audit_year}"
-        
-        return self._make_request(endpoint_name='additional_ueis', params=params, handle_429=handle_429)
-
     def get_all_additional_ueis(self, batch_size: int = 250, show_progress: bool = False, save_progress: bool = False):
         """"""
         if show_progress:
@@ -619,40 +846,6 @@ class FACClient:
         
         return all_results
     
-    def get_corrective_action_plans(self
-                                    , columns: List[str] | None = None
-                                    , report_id: str | None = None
-                                    , auditee_uei: str | None = None
-                                    , audit_year: int | None = None
-                                    , handle_429: bool = False
-                                    ):
-        """"""
-        params = {}  # Initialize an empty dictionary for query parameters.
-        if columns is not None:
-            if isinstance(columns, list):
-                for col in columns:  # Validate that all columns input are allowed columns.
-                    allowed_columns = [  # List of allowed columns for the general endpoint.
-                        'report_id'
-                        , 'auditee_uei'
-                        , 'audit_year'
-                        , 'finding_ref_number'
-                        , 'contains_chart_or_table'
-                        , 'planned_action'
-                    ]
-                    if col.strip().lower() not in allowed_columns:
-                        raise ValueError(f"Invalid column name: {col}. Allowed columns: {', '.join(allowed_columns)}.")
-                params['select'] = ','.join(columns)
-            else:
-                raise TypeError(f"columns must be a list, got {type(columns).__name__}.")
-        if report_id is not None:
-            params['report_id'] = f"eq.{report_id}"
-        if auditee_uei is not None:
-            params['auditee_uei'] = f"eq.{auditee_uei}"
-        if audit_year is not None:
-            params['audit_year'] = f"eq.{audit_year}"
-        
-        return self._make_request(endpoint_name='corrective_action_plans', params=params, handle_429=handle_429)
-
     def get_all_corrective_action_plans(self, batch_size: int = 250, show_progress: bool = False, save_progress: bool = False):
         """"""
         if show_progress:
@@ -730,48 +923,6 @@ class FACClient:
         
         return all_results
     
-    def get_findings(self
-                     , columns: List[str] | None = None
-                     , report_id: str | None = None
-                     , auditee_uei: str | None = None
-                     , audit_year: int | None = None
-                     , handle_429: bool = False
-                     ) -> List[Dict]:
-        """"""
-        params = {}  # Initialize an empty dictionary for query parameters.
-        if columns is not None:
-            if isinstance(columns, list):
-                for col in columns:  # Validate that all columns input are allowed columns.
-                    allowed_columns = [  # List of allowed columns for the general endpoint.
-                        'report_id'
-                        , 'auditee_uei'
-                        , 'audit_year'
-                        , 'award_reference'
-                        , 'reference_number'
-                        , 'is_material_weakness'
-                        , 'is_modified_opinion'
-                        , 'is_other_findings'
-                        , 'is_other_matters'
-                        , 'prior_finding_ref_numbers'
-                        , 'is_questioned_costs'
-                        , 'is_repeat_finding'
-                        , 'is_significant_deficiency'
-                        , 'type_requirement'
-                    ]
-                    if col.strip().lower() not in allowed_columns:
-                        raise ValueError(f"Invalid column name: {col}. Allowed columns: {', '.join(allowed_columns)}.")
-                params['select'] = ','.join(columns)
-            else:
-                raise TypeError(f"columns must be a list, got {type(columns).__name__}.")
-        if report_id is not None:
-            params['report_id'] = f"eq.{report_id}"
-        if auditee_uei is not None:
-            params['auditee_uei'] = f"eq.{auditee_uei}"
-        if audit_year is not None:
-            params['audit_year'] = f"eq.{audit_year}"
-        
-        return self._make_request(endpoint_name='findings', params=params, handle_429=handle_429)
-
     def get_all_findings(self, batch_size: int = 250, show_progress: bool = False, save_progress: bool = False):
         """"""
         if show_progress:
@@ -849,40 +1000,6 @@ class FACClient:
         
         return all_results
     
-    def get_findings_text(self
-                          , columns: List[str] | None = None
-                          , report_id: str | None = None
-                          , auditee_uei: str | None = None
-                          , audit_year: int | None = None
-                          , handle_429: bool = False
-                          ) -> List[Dict]:
-        """"""
-        params = {}  # Initialize an empty dictionary for query parameters.
-        if columns is not None:
-            if isinstance(columns, list):
-                for col in columns:  # Validate that all columns input are allowed columns.
-                    allowed_columns = [  # List of allowed columns for the general endpoint.
-                        'report_id'
-                        , 'auditee_uei'
-                        , 'audit_year'
-                        , 'finding_ref_number'
-                        , 'contains_chart_or_table'
-                        , 'finding_text'
-                    ]
-                    if col.strip().lower() not in allowed_columns:
-                        raise ValueError(f"Invalid column name: {col}. Allowed columns: {', '.join(allowed_columns)}.")
-                params['select'] = ','.join(columns)
-            else:
-                raise TypeError(f"columns must be a list, got {type(columns).__name__}.")
-        if report_id is not None:
-            params['report_id'] = f"eq.{report_id}"
-        if auditee_uei is not None:
-            params['auditee_uei'] = f"eq.{auditee_uei}"
-        if audit_year is not None:
-            params['audit_year'] = f"eq.{audit_year}"
-        
-        return self._make_request(endpoint_name='findings_text', params=params, handle_429=handle_429)
-
     def get_all_findings_text(self, batch_size: int = 250, show_progress: bool = False, save_progress: bool = False):
         """"""
         if show_progress:
@@ -960,43 +1077,6 @@ class FACClient:
         
         return all_results
     
-    def get_notes_to_sefa(self
-                          , columns: List[str] | None = None
-                          , report_id: str | None = None
-                          , auditee_uei: str | None = None
-                          , audit_year: int | None = None
-                          , handle_429: bool = False
-                          ) -> List[Dict]:
-        """"""
-        params = {}  # Initialize an empty dictionary for query parameters.
-        if columns is not None:
-            if isinstance(columns, list):
-                for col in columns:  # Validate that all columns input are allowed columns.
-                    allowed_columns = [  # List of allowed columns for the general endpoint.
-                        'report_id'
-                        , 'auditee_uei'
-                        , 'audit_year'
-                        , 'title'
-                        , 'accounting_policies'
-                        , 'is_minimis_rate_used'
-                        , 'rate_explained'
-                        , 'content'
-                        , 'contains_chart_or_table'
-                    ]
-                    if col.strip().lower() not in allowed_columns:
-                        raise ValueError(f"Invalid column name: {col}. Allowed columns: {', '.join(allowed_columns)}.")
-                params['select'] = ','.join(columns)
-            else:
-                raise TypeError(f"columns must be a list, got {type(columns).__name__}.")
-        if report_id is not None:
-            params['report_id'] = f"eq.{report_id}"
-        if auditee_uei is not None:
-            params['auditee_uei'] = f"eq.{auditee_uei}"
-        if audit_year is not None:
-            params['audit_year'] = f"eq.{audit_year}"
-        
-        return self._make_request(endpoint_name='notes_to_sefa', params=params, handle_429=handle_429)
-
     def get_all_notes_to_sefa(self, batch_size: int = 250, show_progress: bool = False, save_progress: bool = False):
         """"""
         if show_progress:
@@ -1074,44 +1154,6 @@ class FACClient:
         
         return all_results
     
-    def get_passthrough(self
-                        , columns: List[str] | None = None
-                        , report_id: str | None = None
-                        , auditee_uei: str | None = None
-                        , audit_year: int | None = None
-                        , passthrough_id: str | None = None
-                        , handle_429: bool = False
-                        ) -> List[Dict]:
-        """
-        """
-        params = {}  # Initialize an empty dictionary for query parameters.
-        if columns is not None:
-            if isinstance(columns, list):
-                for col in columns:  # Validate that all columns input are allowed columns.
-                    allowed_columns = [  # List of allowed columns for the general endpoint.
-                        'report_id'
-                        , 'auditee_uei'
-                        , 'audit_year'
-                        , 'award_reference'
-                        , 'passthrough_id'
-                        , 'passthrough_name'
-                    ]
-                    if col.strip().lower() not in allowed_columns:
-                        raise ValueError(f"Invalid column name: {col}. Allowed columns: {', '.join(allowed_columns)}.")
-                params['select'] = ','.join(columns)
-            else:
-                raise TypeError(f"columns must be a list, got {type(columns).__name__}.")
-        if report_id is not None:
-            params['report_id'] = f"eq.{report_id}"
-        if auditee_uei is not None:
-            params['auditee_uei'] = f"eq.{auditee_uei}"
-        if audit_year is not None:
-            params['audit_year'] = f"eq.{audit_year}"
-        if passthrough_id is not None:
-            params['passthrough_id'] = f"eq.{passthrough_id}"
-        
-        return self._make_request(endpoint_name='passthrough', params=params, handle_429=handle_429)
-
     def get_all_passthrough(self, batch_size: int = 250, show_progress: bool = False, save_progress: bool = False):
         """"""
         if show_progress:
@@ -1189,48 +1231,6 @@ class FACClient:
         
         return all_results
     
-    def get_secondary_auditors(self
-                               , columns: List[str] | None = None
-                               , report_id: str | None = None
-                               , auditee_uei: str | None = None
-                               , audit_year: int | None = None
-                               , handle_429: bool = False
-                               ) -> List[Dict]:
-        """
-        """
-        params = {}  # Initialize an empty dictionary for query parameters.
-        if columns is not None:
-            if isinstance(columns, list):
-                for col in columns:  # Validate that all columns input are allowed columns.
-                    allowed_columns = [  # List of allowed columns for the general endpoint.
-                        'report_id'
-                        , 'auditee_uei'
-                        , 'audit_year'
-                        , 'auditor_ein'
-                        , 'auditor_name'
-                        , 'contact_name'
-                        , 'contact_title'
-                        , 'contact_email'
-                        , 'contact_phone'
-                        , 'address_street'
-                        , 'address_city'
-                        , 'address_state'
-                        , 'address_zipcode'
-                    ]
-                    if col.strip().lower() not in allowed_columns:
-                        raise ValueError(f"Invalid column name: {col}. Allowed columns: {', '.join(allowed_columns)}.")
-                params['select'] = ','.join(columns)
-            else:
-                raise TypeError(f"columns must be a list, got {type(columns).__name__}.")
-        if report_id is not None:
-            params['report_id'] = f"eq.{report_id}"
-        if auditee_uei is not None:
-            params['auditee_uei'] = f"eq.{auditee_uei}"
-        if audit_year is not None:
-            params['audit_year'] = f"eq.{audit_year}"
-        
-        return self._make_request(endpoint_name='secondary_auditors', params=params, handle_429=handle_429)
-
     def get_all_secondary_auditors(self, batch_size: int = 250, show_progress: bool = False, save_progress: bool = False):
         """"""
         if show_progress:
@@ -1308,12 +1308,11 @@ class FACClient:
         
         return all_results
 
+
 #%%
 # Test code.
 if __name__ == "__main__":
-    # city = FACClient().get_general(auditee_city='Vacaville', auditee_state='CA')
-    # print(city)
-    pass
-
+    client = FACClient()
+    
 
 #%%
